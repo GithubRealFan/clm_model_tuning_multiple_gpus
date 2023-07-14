@@ -391,8 +391,6 @@ def main(cfg: DictConfig):
     logger.info(accelerator.state, main_process_only=False)
     logger.info(OmegaConf.to_yaml(cfg))
 
-    setup_ddp(accelerator.local_rank, accelerator.world_size)
-
     tokenizer, model = load_model_and_tokenizer(cfg)
     optimizer = create_optimizer(cfg, model)
 
