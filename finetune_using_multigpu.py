@@ -231,7 +231,7 @@ def cleanup_ddp():
 def train(rank, cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler):
     accelerator.wait_for_everyone()
     model = model.to(rank)
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
+    model = DDP(model, device_ids=[rank])
 
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / cfg.training.gradient_accumulation_steps
@@ -379,6 +379,8 @@ def main(cfg: DictConfig):
         level=logging.INFO,
     )
 
+    setup_ddp(0, cfg.num_gpus)
+
     accelerator = create_accelerator(cfg)
     accelerator.wait_for_everyone()
 
@@ -388,6 +390,8 @@ def main(cfg: DictConfig):
 
     logger.info(accelerator.state, main_process_only=False)
     logger.info(OmegaConf.to_yaml(cfg))
+
+    setup_ddp(accelerator.local_rank, accelerator.world_size)
 
     tokenizer, model = load_model_and_tokenizer(cfg)
     optimizer = create_optimizer(cfg, model)
@@ -499,7 +503,7 @@ def main(cfg: DictConfig):
         model = nn.DataParallel(model)
 
     # Set up distributed training using multiple GPUs
-    if cfg.training.distributed:
+    if accelerator.distributed_type == DistributedType.DDP:
         mp.spawn(
             train,
             args=(cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler),
@@ -522,6 +526,8 @@ def main(cfg: DictConfig):
         )
         if accelerator.is_main_process:
             tokenizer.save_pretrained(cfg.output_dir)
+
+    cleanup_ddp()
 
 
 if __name__ == "__main__":

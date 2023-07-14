@@ -1,5 +1,7 @@
 output_dir: "tuned-model"
 
+num_gpus: 8
+
 bittensor:
   network: "finney"
   netuid: 3
