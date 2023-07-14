@@ -222,7 +222,7 @@ def setup_ddp(rank, world_size):
 
     # Initialize the distributed environment.
     dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
-
+    torch.cuda.set_device(rank)
 
 def cleanup_ddp():
     dist.destroy_process_group()
@@ -231,7 +231,7 @@ def cleanup_ddp():
 def train(rank, cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler):
     accelerator.wait_for_everyone()
     model = model.to(rank)
-    model = DDP(model, device_ids=[rank])
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
 
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / cfg.training.gradient_accumulation_steps
@@ -499,7 +499,7 @@ def main(cfg: DictConfig):
         model = nn.DataParallel(model)
 
     # Set up distributed training using multiple GPUs
-    if accelerator.distributed_type == DistributedType.DDP:
+    if cfg.training.distributed:
         mp.spawn(
             train,
             args=(cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler),

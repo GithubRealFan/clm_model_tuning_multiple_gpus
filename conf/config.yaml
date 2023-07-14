@@ -28,6 +28,7 @@ tokenizer:
 training:
   seed: null
   val_split_percent: 5
+  distributed: true
 
   # if null these both default to bittensor's validator batch size
   train_batch_size: null
