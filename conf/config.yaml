@@ -16,7 +16,7 @@ dataset:
   concatenate_raw: false # only really necessary when loading a local .txt file
 
 model:
-  name: cerebras/Cerebras-GPT-13B
+  name: cerebras/Cerebras-GPT-1.3B
   config_name: null
 
 tokenizer:
