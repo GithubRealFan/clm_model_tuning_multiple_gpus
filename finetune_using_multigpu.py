@@ -551,7 +551,7 @@ def main(cfg: DictConfig):
             join=True,
         )
     else:
-        train(rank=0, cfg=cfg, accelerator=accelerator, logger=logger,
+        train(rank=0, master_addr=master_addr, master_port=master_port, world_size=world_size, cfg=cfg, accelerator=accelerator, logger=logger,
               train_dataloader=train_dataloader, eval_dataloader=eval_dataloader,
               eval_dataset=eval_dataset, tokenizer=tokenizer,
               model=model, optimizer=optimizer, lr_scheduler=lr_scheduler)
