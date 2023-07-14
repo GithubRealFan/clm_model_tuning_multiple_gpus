@@ -528,13 +528,14 @@ def main(cfg: DictConfig):
     logger.info(f"  Total optimization steps = {cfg.training.max_train_steps}")
 
     # Set up distributed training if multiple GPUs are available
-    if accelerator.distributed_type == DistributedType.DP:
+    if accelerator.distributed_type == DistributedType.MULTI_GPU:
         model = model.to(accelerator.device)
         model = nn.DataParallel(model)
+        print("MultiGPU Available!")
 
     # Set up distributed training using multiple GPUs
     print("Set up distributed training using multiple GPUs")
-    if accelerator.distributed_type == DistributedType.DDP:
+    if accelerator.distributed_type == DistributedType.MULTI_GPU:
         
         num_gpus = torch.cuda.device_count()
         print("Torch CUDA device count : ", num_gpus)
