@@ -369,6 +369,9 @@ def train(rank, cfg, accelerator, logger, train_dataloader, eval_dataloader, eva
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
+
+    print("HI")
+
     cfg = check_cfg_and_load_defaults(cfg)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
@@ -379,7 +382,10 @@ def main(cfg: DictConfig):
         level=logging.INFO,
     )
 
-    setup_ddp(0, cfg.num_gpus)
+    num_gpus = torch.cuda.device_count()
+    print("Torch CUDA device count : ", num_gpus)
+
+    setup_ddp(0, num_gpus)
 
     accelerator = create_accelerator(cfg)
     accelerator.wait_for_everyone()
