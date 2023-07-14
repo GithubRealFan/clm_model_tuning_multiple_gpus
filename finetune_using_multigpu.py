@@ -215,23 +215,36 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
 
     return tokenized_datasets
 
+def find_free_port():
+    """ https://stackoverflow.com/questions/1365265/on-localhost-how-do-i-pick-a-free-port-number """
+    import socket
+    from contextlib import closing
 
-def setup_ddp(rank, world_size):
-    print("DDP setup #0")
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return str(s.getsockname()[1])
 
-    # Initialize the distributed environment.
-    print("DDP setup #1")
-    dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
-    print("DDP setup #2")
-    torch.cuda.set_device(rank)
+def setup_ddp(rank, master_addr, master_port, world_size, backend='gloo'):
+    print(f'setting up {rank=} {world_size=} {backend=}')
+
+    # set up the master's ip address so this child process can coordinate
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = master_port
+    print(f"{master_addr=} {master_port=}")
+
+    # Initializes the default distributed process group, and this will also initialize the distributed package.
+    dist.init_process_group(backend, rank=rank, world_size=world_size)
+    print(f"{rank=} init complete")
+    dist.destroy_process_group()
+    print(f"{rank=} destroy complete")
 
 def cleanup_ddp():
     dist.destroy_process_group()
 
 
-def train(rank, cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler):
+def train(rank, master_addr, master_port, world_size, cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler):
+    setup_ddp(rank, master_addr, master_port, world_size)
     accelerator.wait_for_everyone()
     model = model.to(rank)
     model = DDP(model, device_ids=[rank])
@@ -385,11 +398,6 @@ def main(cfg: DictConfig):
         level=logging.INFO,
     )
 
-    num_gpus = torch.cuda.device_count()
-    print("Torch CUDA device count : ", num_gpus)
-
-    setup_ddp(0, num_gpus)
-
     print("DDP setup completed")
 
     accelerator = create_accelerator(cfg)
@@ -527,10 +535,18 @@ def main(cfg: DictConfig):
     # Set up distributed training using multiple GPUs
     print("Set up distributed training using multiple GPUs")
     if accelerator.distributed_type == DistributedType.DDP:
+        
+        num_gpus = torch.cuda.device_count()
+        print("Torch CUDA device count : ", num_gpus)
+
+        world_size = num_gpus
+        master_addr = '127.0.0.1'
+        master_port = find_free_port()
+
         mp.spawn(
             train,
-            args=(cfg, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler),
-            nprocs=accelerator.num_processes,
+            args=(cfg, master_addr, master_port, world_size, accelerator, logger, train_dataloader, eval_dataloader, eval_dataset, tokenizer, model, optimizer, lr_scheduler),
+            nprocs=world_size,
             join=True,
         )
     else:
@@ -550,8 +566,6 @@ def main(cfg: DictConfig):
         )
         if accelerator.is_main_process:
             tokenizer.save_pretrained(cfg.output_dir)
-
-    cleanup_ddp()
 
 
 if __name__ == "__main__":
