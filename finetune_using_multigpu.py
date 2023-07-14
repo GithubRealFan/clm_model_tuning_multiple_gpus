@@ -217,11 +217,14 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
 
 
 def setup_ddp(rank, world_size):
+    print("DDP setup #0")
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
 
     # Initialize the distributed environment.
+    print("DDP setup #1")
     dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
+    print("DDP setup #2")
     torch.cuda.set_device(rank)
 
 def cleanup_ddp():
@@ -387,8 +390,12 @@ def main(cfg: DictConfig):
 
     setup_ddp(0, num_gpus)
 
+    print("DDP setup completed")
+
     accelerator = create_accelerator(cfg)
+    print("accelerator Created!")
     accelerator.wait_for_everyone()
+    print("accelerator wait successed!")
 
     if cfg.training.seed is not None:
         logger.info(f"Setting random seed to {cfg.training.seed}")
@@ -398,7 +405,9 @@ def main(cfg: DictConfig):
     logger.info(OmegaConf.to_yaml(cfg))
 
     tokenizer, model = load_model_and_tokenizer(cfg)
+    print("model loaded!")
     optimizer = create_optimizer(cfg, model)
+    print("optimizer created!")
 
     lr_scheduler = get_scheduler(
         name=cfg.training.lr_scheduler,
@@ -410,10 +419,12 @@ def main(cfg: DictConfig):
     # On TPU, the tie weights in our model have been disconnected, so we need to restore the ties.
     if accelerator.distributed_type == DistributedType.TPU:
         model.tie_weights()
+    print("model tied!")
 
     # Load and preprocess data
     raw_datasets = load_raw_datasets(cfg)
     tokenized_datasets = preprocess(cfg, accelerator, tokenizer, raw_datasets)
+    print("tokenized datasets!")
     if "train" not in tokenized_datasets.column_names:
         tokenized_datasets = tokenized_datasets.train_test_split(
             test_size=cfg.training.val_split_percent / 100
@@ -432,6 +443,7 @@ def main(cfg: DictConfig):
         ex = train_dataset[index]
         logger.info(f"Sample {index} of the training set: {ex}: \n")
         logger.info(tokenizer.decode(ex["input_ids"]))
+    print("Log a few random samples from the training set")
 
     # DataLoaders creation:
     train_dataloader = DataLoader(
@@ -445,6 +457,7 @@ def main(cfg: DictConfig):
         collate_fn=default_data_collator,
         batch_size=cfg.training.eval_batch_size,
     )
+    print("DataLoaders Created!")
 
     # Prepare everything using our accelerator
     (
@@ -456,12 +469,14 @@ def main(cfg: DictConfig):
     ) = accelerator.prepare(
         model, optimizer, train_dataloader, eval_dataloader, lr_scheduler
     )
+    print("Prepared everything using our accelerator!")
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / cfg.training.gradient_accumulation_steps
     )
+    print("Scheduler and math around the number of training steps!")
     if cfg.training.max_train_steps is None:
         cfg.training.max_train_steps = (
             cfg.training.num_epochs * num_update_steps_per_epoch
@@ -477,10 +492,12 @@ def main(cfg: DictConfig):
         cfg.training.max_train_steps = (
             cfg.training.num_epochs * num_update_steps_per_epoch
         )
+    print("Recalculated our total training steps as the size of the training dataloader")
     # Afterwards we recalculate our number of training epochs
     cfg.training.num_epochs = math.ceil(
         cfg.training.max_train_steps / num_update_steps_per_epoch
     )
+    print("Afterwards we recalculate our number of training epochs")
 
     # We need to initialize the trackers we use, and also store our configuration.
     # We initialize the trackers only on main process because `accelerator.log`
@@ -492,6 +509,7 @@ def main(cfg: DictConfig):
             "lr_scheduler_type"
         ].value
         accelerator.init_trackers("finetune_using_clm", experiment_config)
+    print("Initialized the trackers we use, and also store our configuration")
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -507,6 +525,7 @@ def main(cfg: DictConfig):
         model = nn.DataParallel(model)
 
     # Set up distributed training using multiple GPUs
+    print("Set up distributed training using multiple GPUs")
     if accelerator.distributed_type == DistributedType.DDP:
         mp.spawn(
             train,
@@ -519,6 +538,7 @@ def main(cfg: DictConfig):
               train_dataloader=train_dataloader, eval_dataloader=eval_dataloader,
               eval_dataset=eval_dataset, tokenizer=tokenizer,
               model=model, optimizer=optimizer, lr_scheduler=lr_scheduler)
+    print("Trainned")
 
     if cfg.output_dir is not None:
         accelerator.wait_for_everyone()
