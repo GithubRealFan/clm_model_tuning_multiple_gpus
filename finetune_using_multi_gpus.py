@@ -16,6 +16,7 @@ from itertools import chain
 
 import datasets
 import hydra
+import ssl
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -518,6 +519,7 @@ def find_free_port(start_port=50000):
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
+    ssl._create_default_https_context = ssl._create_unverified_context
     os.environ['RANK'] = '0'
     os.environ['WORLD_SIZE'] = str(cfg.distributed.nprocs)
     os.environ['MASTER_ADDR'] = '127.0.0.1'
