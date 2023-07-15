@@ -521,7 +521,7 @@ def main(cfg: DictConfig):
     os.environ['RANK'] = '0'
     os.environ['WORLD_SIZE'] = str(cfg.distributed.nprocs)
     os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = find_free_port(start_port=70000)
+    os.environ['MASTER_PORT'] = find_free_port(start_port=60000)
 
     # Use multiprocessing to enable distributed training with multiple GPUs
     mp.spawn(distributed_main, args=(cfg,), nprocs=cfg.distributed.nprocs, join=True)
