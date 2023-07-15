@@ -17,6 +17,8 @@ from itertools import chain
 import datasets
 import hydra
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
 import transformers
 from accelerate import Accelerator, DistributedType
 from accelerate.logging import get_logger
@@ -36,7 +38,6 @@ from transformers import (
 
 import bittensor
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
 
 def check_cfg_and_load_defaults(cfg: DictConfig) -> DictConfig:
     subtensor = bittensor.subtensor(network=cfg.bittensor.network)
@@ -63,12 +64,17 @@ def create_accelerator(cfg: DictConfig) -> Accelerator:
         datasets.utils.logging.set_verbosity_error()
         transformers.utils.logging.set_verbosity_error()
 
+    # Use distributed training if multiple GPUs are available
+    if accelerator.distributed_type == DistributedType.MULTI_GPU:
+        accelerator.accelerate(accelerator.training_type)
+        accelerator.wait_for_everyone()
+        dist.barrier()
+
     return accelerator
 
 
 def load_raw_datasets(cfg: DictConfig) -> DatasetDict:
     if cfg.dataset.name == "bittensor":
-
         dataset = bittensor.dataset(
             no_tokenizer=True,
             batch_size=cfg.training.train_batch_size,
@@ -97,6 +103,7 @@ def load_raw_datasets(cfg: DictConfig) -> DatasetDict:
     else:
         raw_datasets = load_dataset(cfg.dataset.name, cfg.dataset.config_name)
 
+    raw_datasets = accelerator.shard(raw_datasets)
     return raw_datasets
 
 
@@ -125,8 +132,6 @@ def load_model_and_tokenizer(cfg: DictConfig):
     )
     model.resize_token_embeddings(len(tokenizer))
 
-    model = torch.nn.DataParallel(model)
-
     return tokenizer, model
 
 
@@ -150,9 +155,15 @@ def create_optimizer(cfg, model):
             "weight_decay": 0.0,
         },
     ]
-    return torch.optim.AdamW(
-        optimizer_grouped_parameters, lr=cfg.training.learning_rate
+
+    # Wrap the optimizer with a distributed optimizer
+    optimizer = torch.optim.AdamW(
+        optimizer_grouped_parameters,
+        lr=cfg.training.learning_rate,
     )
+    optimizer = accelerator.prepare(optimizer)
+
+    return optimizer
 
 
 def preprocess(cfg, accelerator, tokenizer, raw_datasets):
@@ -169,13 +180,11 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
         concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
         total_length = len(concatenated_examples[list(examples.keys())[0]])
         if total_length >= cfg.dataset.block_size:
-            total_length = (
-                                   total_length // cfg.dataset.block_size
-                           ) * cfg.dataset.block_size
+            total_length = (total_length // cfg.dataset.block_size) * cfg.dataset.block_size
         # Split by chunks of max_len.
         result = {
             k: [
-                t[i: i + cfg.dataset.block_size]
+                t[i : i + cfg.dataset.block_size]
                 for i in range(0, total_length, cfg.dataset.block_size)
             ]
             for k, t in concatenated_examples.items()
@@ -194,7 +203,6 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
         return result
 
     with accelerator.main_process_first():
-
         tokenized_datasets = raw_datasets.map(
             tokenize_fn,
             batched=True,
@@ -212,11 +220,12 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
                 desc=f"Grouping texts in chunks of {cfg.dataset.block_size}",
             )
 
+        tokenized_datasets = accelerator.shard(tokenized_datasets)
+
     return tokenized_datasets
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
-def main(cfg: DictConfig):
+def distributed_main(cfg):
     cfg = check_cfg_and_load_defaults(cfg)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
@@ -274,13 +283,13 @@ def main(cfg: DictConfig):
         logger.info(tokenizer.decode(ex["input_ids"]))
 
     # DataLoaders creation:
-    train_dataloader = DataLoader(
+    train_dataloader = accelerator.prepare_data_loader(
         train_dataset,
-        shuffle=True,
         collate_fn=default_data_collator,
         batch_size=cfg.training.train_batch_size,
+        shuffle=True,
     )
-    eval_dataloader = DataLoader(
+    eval_dataloader = accelerator.prepare_data_loader(
         eval_dataset,
         collate_fn=default_data_collator,
         batch_size=cfg.training.eval_batch_size,
@@ -304,7 +313,7 @@ def main(cfg: DictConfig):
     )
     if cfg.training.max_train_steps is None:
         cfg.training.max_train_steps = (
-                cfg.training.num_epochs * num_update_steps_per_epoch
+            cfg.training.num_epochs * num_update_steps_per_epoch
         )
         overrode_max_train_steps = True
 
@@ -315,7 +324,7 @@ def main(cfg: DictConfig):
     )
     if overrode_max_train_steps:
         cfg.training.max_train_steps = (
-                cfg.training.num_epochs * num_update_steps_per_epoch
+            cfg.training.num_epochs * num_update_steps_per_epoch
         )
     # Afterwards we recalculate our number of training epochs
     cfg.training.num_epochs = math.ceil(
@@ -347,7 +356,7 @@ def main(cfg: DictConfig):
         disable=not accelerator.is_local_main_process,
     )
 
-    completed_steps = 0
+    completed_steps = accelerator.completed_steps
     starting_epoch = 0
 
     # Potentially load in the weights and states from a previous save
@@ -375,8 +384,8 @@ def main(cfg: DictConfig):
         for step, batch in enumerate(train_dataloader):
             # We need to skip steps until we reach the resumed step
             if (
-                    cfg.training.checkpoint.resume_from_checkpoint
-                    and epoch == starting_epoch
+                cfg.training.checkpoint.resume_from_checkpoint
+                and epoch == starting_epoch
             ):
                 if resume_step is not None and step < resume_step:
                     completed_steps += 1
@@ -394,8 +403,8 @@ def main(cfg: DictConfig):
             accelerator.backward(loss)
 
             if (
-                    step % cfg.training.gradient_accumulation_steps == 0
-                    or step == len(train_dataloader) - 1
+                step % cfg.training.gradient_accumulation_steps == 0
+                or step == len(train_dataloader) - 1
             ):
                 optimizer.step()
                 lr_scheduler.step()
@@ -465,6 +474,12 @@ def main(cfg: DictConfig):
         )
         if accelerator.is_main_process:
             tokenizer.save_pretrained(cfg.output_dir)
+
+
+@hydra.main(version_base=None, config_path="conf", config_name="config")
+def main(cfg: DictConfig):
+    # Use multiprocessing to enable distributed training with multiple GPUs
+    mp.spawn(distributed_main, args=(cfg,), nprocs=cfg.distributed.nprocs, join=True)
 
 
 if __name__ == "__main__":
