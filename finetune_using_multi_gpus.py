@@ -225,7 +225,7 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
     return tokenized_datasets
 
 
-def distributed_main(cfg):
+def distributed_main(rank, cfg):
     cfg = check_cfg_and_load_defaults(cfg)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
