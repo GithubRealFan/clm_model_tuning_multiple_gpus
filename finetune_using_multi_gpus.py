@@ -27,6 +27,7 @@ from accelerate.utils import set_seed
 from datasets import Dataset, DatasetDict, load_dataset
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
+import torch.distributed as dist
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import (
@@ -253,6 +254,8 @@ def distributed_main(rank, cfg):
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
     )
+
+    dist.init_process_group(backend='nccl')
 
     accelerator = create_accelerator(cfg)
     accelerator.wait_for_everyone()
