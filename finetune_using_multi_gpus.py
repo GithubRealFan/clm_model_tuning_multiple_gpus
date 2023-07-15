@@ -135,7 +135,7 @@ def load_model_and_tokenizer(cfg: DictConfig):
     return tokenizer, model
 
 
-def create_optimizer(cfg, model):
+def create_optimizer(cfg, model, accelerator):
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
@@ -247,7 +247,7 @@ def distributed_main(rank, cfg):
     logger.info(OmegaConf.to_yaml(cfg))
 
     tokenizer, model = load_model_and_tokenizer(cfg)
-    optimizer = create_optimizer(cfg, model)
+    optimizer = create_optimizer(cfg, model, accelerator)
 
     lr_scheduler = get_scheduler(
         name=cfg.training.lr_scheduler,
