@@ -501,11 +501,22 @@ def distributed_main(rank, cfg):
         if accelerator.is_main_process:
             tokenizer.save_pretrained(cfg.output_dir)
 
+def find_free_port():
+    import socket
+    from contextlib import closing
+
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return str(s.getsockname()[1])
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
     os.environ['RANK'] = '0'
     os.environ['WORLD_SIZE'] = str(cfg.distributed.nprocs)
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = find_free_port()
+
     # Use multiprocessing to enable distributed training with multiple GPUs
     mp.spawn(distributed_main, args=(cfg,), nprocs=cfg.distributed.nprocs, join=True)
 
