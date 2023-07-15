@@ -535,6 +535,9 @@ def main(cfg: DictConfig):
 
     # Set up distributed training using multiple GPUs
     print("Set up distributed training using multiple GPUs")
+
+    print("Accelerator Distributed Type : ", accelerator.distributed_type)
+
     if accelerator.distributed_type == DistributedType.MULTI_GPU:
         
         num_gpus = torch.cuda.device_count()
