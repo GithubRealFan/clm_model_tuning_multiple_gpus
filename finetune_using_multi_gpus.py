@@ -20,7 +20,7 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import transformers
-from transformers import DataCollator
+import torch.utils.data.distributed
 from accelerate import Accelerator, DistributedType
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
@@ -302,22 +302,20 @@ def distributed_main(rank, cfg):
 
     # DataLoaders creation:
 
-    data_collator = DataCollator.from_tokenizer(tokenizer)
-
-    train_dataloader = accelerator.prepare_data_loader(
-        torch.utils.data.DataLoader(
-            train_dataset,
-            collate_fn=data_collator,
-            batch_size=cfg.training.train_batch_size,
-            shuffle=True,
-        )
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=cfg.training.train_batch_size,
+        sampler=train_sampler,
+        collate_fn=default_data_collator,
     )
-    eval_dataloader = accelerator.prepare_data_loader(
-        torch.utils.data.DataLoader(
-            eval_dataset,
-            collate_fn=data_collator,
-            batch_size=cfg.training.eval_batch_size,
-        )
+
+    eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset)
+    eval_dataloader = torch.utils.data.DataLoader(
+        eval_dataset,
+        batch_size=cfg.training.eval_batch_size,
+        sampler=eval_sampler,
+        collate_fn=default_data_collator,
     )
 
     # Prepare everything using our accelerator
