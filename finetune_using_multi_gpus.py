@@ -73,7 +73,7 @@ def create_accelerator(cfg: DictConfig) -> Accelerator:
     return accelerator
 
 
-def load_raw_datasets(cfg: DictConfig) -> DatasetDict:
+def load_raw_datasets(cfg: DictConfig, accelerator) -> DatasetDict:
     if cfg.dataset.name == "bittensor":
         dataset = bittensor.dataset(
             no_tokenizer=True,
@@ -103,7 +103,16 @@ def load_raw_datasets(cfg: DictConfig) -> DatasetDict:
     else:
         raw_datasets = load_dataset(cfg.dataset.name, cfg.dataset.config_name)
 
-    raw_datasets = accelerator.shard(raw_datasets)
+    # Manually shard the raw datasets using DistributedSampler
+    if accelerator.distributed_type == DistributedType.MULTI_GPU:
+        sampler = torch.utils.data.distributed.DistributedSampler(raw_datasets)
+        raw_datasets.set_format(type="torch")
+        raw_datasets = raw_datasets.select(range(len(raw_datasets)))
+        raw_datasets = raw_datasets.select(
+            sampler=sampler,
+            num_examples=len(raw_datasets),
+            shuffle=False
+        )
     return raw_datasets
 
 
@@ -220,8 +229,16 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
                 desc=f"Grouping texts in chunks of {cfg.dataset.block_size}",
             )
 
-        tokenized_datasets = accelerator.shard(tokenized_datasets)
-
+        if accelerator.distributed_type == DistributedType.MULTI_GPU:
+            sampler = torch.utils.data.distributed.DistributedSampler(tokenized_datasets)
+            tokenized_datasets.set_format(type="torch")
+            tokenized_datasets = tokenized_datasets.select(range(len(tokenized_datasets)))
+            tokenized_datasets = tokenized_datasets.select(
+                sampler=sampler,
+                num_examples=len(tokenized_datasets),
+                shuffle=False
+            )
+        
     return tokenized_datasets
 
 
@@ -261,7 +278,7 @@ def distributed_main(rank, cfg):
         model.tie_weights()
 
     # Load and preprocess data
-    raw_datasets = load_raw_datasets(cfg)
+    raw_datasets = load_raw_datasets(cfg, accelerator)
     tokenized_datasets = preprocess(cfg, accelerator, tokenizer, raw_datasets)
     if "train" not in tokenized_datasets.column_names:
         tokenized_datasets = tokenized_datasets.train_test_split(
