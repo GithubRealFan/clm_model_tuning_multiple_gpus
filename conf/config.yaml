@@ -25,11 +25,12 @@ tokenizer:
   preprocessing_num_workers: null
   pad_token: "[PAD]"
 
+distributed:
+  nprocs: 2
+
 training:
   seed: null
   val_split_percent: 5
-  distributed:
-    nprocs: 2
 
   # if null these both default to bittensor's validator batch size
   train_batch_size: null
