@@ -509,9 +509,12 @@ def find_free_port(start_port=50000):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             if s.connect_ex(('127.0.0.1', port)) == 0:
                 continue
-            s.bind(('127.0.0.1', port))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            return str(port)
+            try:
+                s.bind(('127.0.0.1', port))
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                return str(port)
+            except OSError:
+                continue
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
