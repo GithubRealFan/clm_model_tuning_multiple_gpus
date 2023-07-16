@@ -9,14 +9,22 @@ deepspeed_config_file = "conf/deepspeed_config.json"
 
 # Initialize the model and tokenizer using DeepSpeed
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
-model, _, _, _ = deepspeed.initialize(model=model, config_params=deepspeed_config_file)
+model = model.to('cuda')  # Move the model to the first GPU (rank 0)
 
-model = torch.nn.DataParallel(model)
+# Initialize DeepSpeed with the proper world_size
+model, _, _, _ = deepspeed.initialize(model=model, config_params=deepspeed_config_file, world_size=8)
+
+# Wrap the model with DistributedDataParallel
+model = torch.nn.parallel.DistributedDataParallel(
+    model,
+    device_ids=[torch.cuda.current_device()],
+    output_device=torch.cuda.current_device(),
+)
 
 # Create the pipeline
 pipeline = transformers.pipeline(
     "text-generation",
-    model=model,
+    model=model.module,  # Use the module attribute when wrapping with DistributedDataParallel
     tokenizer=tokenizer,
     torch_dtype=torch.bfloat16,
     trust_remote_code=True,
