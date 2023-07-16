@@ -49,6 +49,10 @@ training:
     resume_from_checkpoint: 0 # integer representing which checkpoint to load from, or <= 0 to not
     every_n_steps: null
 
+  deepspeed_config:
+    train_micro_batch_size_per_gpu: 1  # Change this according to your GPU memory
+    steps_per_print: 100  # Adjust as needed
+
 tracking:
   enabled: false
   report_to: "all"
