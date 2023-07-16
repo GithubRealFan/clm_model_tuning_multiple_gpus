@@ -26,7 +26,7 @@ tokenizer:
   pad_token: "[PAD]"
 
 distributed:
-  nprocs: 1
+  nprocs: 4
 
 training:
   seed: null
