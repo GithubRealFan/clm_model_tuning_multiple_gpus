@@ -5,9 +5,11 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 model_name = "tiiuae/falcon-40b-instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
+deepspeed_config_file = "conf/deepspeed_config.json"
+
 # Initialize the model and tokenizer using DeepSpeed
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
-model, _, _, _ = deepspeed.initialize(model=model)
+model, _, _, _ = deepspeed.initialize(model=model, config_params=deepspeed_config_file)
 
 # Create the pipeline
 pipeline = transformers.pipeline(
