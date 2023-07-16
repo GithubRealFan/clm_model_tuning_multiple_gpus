@@ -239,7 +239,7 @@ def main(cfg: DictConfig):
     tokenizer, model = load_model_and_tokenizer(cfg)
     optimizer = create_optimizer(cfg, model)
 
-    ds_config = deepspeed.DeepSpeedConfig("deepspeed_config.json")
+    ds_config = deepspeed.DeepSpeedConfig("conf/deepspeed_config.json")
     
     # Wrap the model with DeepSpeed
     model, _, _, _ = deepspeed.initialize(model=model, optimizer=optimizer, config_params=ds_config)
