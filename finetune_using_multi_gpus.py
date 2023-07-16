@@ -511,6 +511,7 @@ def find_free_port():
         s.bind(('', 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         port= s.getsockname()[1]
+        print(port)
         if port > 5000 and port < 5100:
             return str(s.getsockname()[1])
 
