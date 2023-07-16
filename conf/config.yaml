@@ -49,7 +49,7 @@ training:
     resume_from_checkpoint: 0 # integer representing which checkpoint to load from, or <= 0 to not
     every_n_steps: null
 
-deepspeed_config: "conf"
+deepspeed_config: "conf/deepspeed_config.json"
 
 tracking:
   enabled: false

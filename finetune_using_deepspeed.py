@@ -13,6 +13,7 @@ import math
 import os
 import random
 import yaml
+import json
 from itertools import chain
 
 import datasets
@@ -239,7 +240,9 @@ def main(cfg: DictConfig):
     tokenizer, model = load_model_and_tokenizer(cfg)
     optimizer = create_optimizer(cfg, model)
 
-    ds_config = deepspeed.DeepSpeedConfig("conf/deepspeed_config.json")
+    deepspeed_cfg_path = hydra.utils.to_absolute_path(cfg.deepspeed_config)
+    with open(deepspeed_cfg_path, 'r') as f:
+        ds_config = json.load(f)
     
     # Wrap the model with DeepSpeed
     model, _, _, _ = deepspeed.initialize(model=model, optimizer=optimizer, config_params=ds_config)
