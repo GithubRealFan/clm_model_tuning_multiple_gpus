@@ -383,7 +383,7 @@ def distributed_main(rank, cfg):
         disable=not accelerator.is_local_main_process,
     )
 
-    completed_steps = accelerator.completed_steps
+    completed_steps = 0
     starting_epoch = 0
 
     # Potentially load in the weights and states from a previous save
