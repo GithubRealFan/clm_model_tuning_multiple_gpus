@@ -3,10 +3,10 @@ import deepspeed
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 model_name = "tiiuae/falcon-40b-instruct"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 # Initialize the model and tokenizer using DeepSpeed
-model = AutoModelForCausalLM.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 model, _, _, _ = deepspeed.initialize(model=model)
 
 # Create the pipeline
