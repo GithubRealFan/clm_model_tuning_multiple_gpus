@@ -10,8 +10,9 @@ deepspeed_config_file = "conf/deepspeed_config.json"
 # Initialize the model and tokenizer using DeepSpeed with model parallelism
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
-# Split the model across multiple GPUs using DeepSpeed's model parallelism
-model = deepspeed.DeepSpeedEngine(model=model, config_params=deepspeed_config_file)
+num_gpus = 8
+deepspeed_args = deepspeed.DeepSpeedArguments(num_gpus=num_gpus)
+model, _, _, _ = deepspeed.initialize(model=model, config_params=deepspeed_config_file, args=deepspeed_args)
 
 # Create the pipeline
 pipeline = transformers.pipeline(
