@@ -12,6 +12,7 @@ import logging
 import math
 import os
 import random
+import yaml
 from itertools import chain
 
 import datasets
@@ -217,6 +218,10 @@ def preprocess(cfg, accelerator, tokenizer, raw_datasets):
 def main(cfg: DictConfig):
     cfg = check_cfg_and_load_defaults(cfg)
     os.makedirs(cfg.output_dir, exist_ok=True)
+
+    # if cfg.training.deepspeed_config is not None:
+    #     deepspeed_config = yaml.safe_load(cfg.training.deepspeed_config)
+    #     cfg.deepspeed_config = deepspeed_config
 
     logger = get_logger(__name__)
     logging.basicConfig(
