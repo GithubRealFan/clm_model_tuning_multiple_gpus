@@ -2,24 +2,11 @@
     "num_gpus": 8,
     "train_batch_size": 1,
     "train_micro_batch_size_per_gpu": 1,
-    "gradient_accumulation_steps": 1,
-    "zero_optimization": {
-        "stage": 2,
-        "offload_optimizer": {
-            "device": "cpu",
-            "pin_memory": true
-        }
-    },
-    "fp16_optimizer": {
-        "enabled": true,
-        "dynamic_loss_scale": false
-    },
-    "activation_checkpointing": {
+    "steps_per_print": 1,
+    "steps_per_save": 10000,
+    "deepspeed": {
+        "activation_checkpointing": true,
         "partition_activations": true,
-        "contiguous_gradients": true,
-        "allocate_fp16": true,
-        "sync": true,
-        "verbose": false
-    },
-    "wall_clock_breakdown": false
+        "partition_weights": true
+    }
 }
