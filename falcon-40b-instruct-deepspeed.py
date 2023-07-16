@@ -11,6 +11,8 @@ deepspeed_config_file = "conf/deepspeed_config.json"
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 model, _, _, _ = deepspeed.initialize(model=model, config_params=deepspeed_config_file)
 
+model = torch.nn.DataParallel(model)
+
 # Create the pipeline
 pipeline = transformers.pipeline(
     "text-generation",
