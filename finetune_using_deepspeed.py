@@ -219,10 +219,6 @@ def main(cfg: DictConfig):
     cfg = check_cfg_and_load_defaults(cfg)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
-    if cfg.training.deepspeed_config is not None:
-        deepspeed_config = yaml.safe_load(cfg.training.deepspeed_config)
-        cfg.deepspeed_config = deepspeed_config
-
     logger = get_logger(__name__)
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -243,8 +239,10 @@ def main(cfg: DictConfig):
     tokenizer, model = load_model_and_tokenizer(cfg)
     optimizer = create_optimizer(cfg, model)
 
+    ds_config = deepspeed.DeepSpeedConfig("deepspeed_config.json")
+    
     # Wrap the model with DeepSpeed
-    model, _, _, _ = deepspeed.initialize(model=model, optimizer=optimizer)
+    model, _, _, _ = deepspeed.initialize(model=model, optimizer=optimizer, config_params=ds_config)
 
     # Replace the original optimizer with the DeepSpeed optimizer
     optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(model_parameters=model.parameters(), dp_optimizer=optimizer, config=None)
