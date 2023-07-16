@@ -245,7 +245,7 @@ def main(cfg: DictConfig):
         ds_config = json.load(f)
     
     # Wrap the model with DeepSpeed
-    model, _, _, _ = deepspeed.initialize(model=model, optimizer=optimizer, config_params=ds_config)
+    model, _, _, _ = deepspeed.initialize(model=model, optimizer=torch.optim.AdamW, config_params=ds_config)
 
     # Replace the original optimizer with the DeepSpeed optimizer
     optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(model_parameters=model.parameters(), dp_optimizer=optimizer, config=None)
