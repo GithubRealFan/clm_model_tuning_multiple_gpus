@@ -34,7 +34,6 @@ from transformers import (
     get_scheduler,
 )
 import deepspeed
-from transformers import DeepSpeedEngine, DeepSpeedZeroRedundancyOptimizer
 
 import bittensor
 
@@ -243,7 +242,7 @@ def main(cfg: DictConfig):
     model, _, _, _ = deepspeed.initialize(model=model, optimizer=optimizer)
 
     # Replace the original optimizer with the DeepSpeed optimizer
-    optimizer = DeepSpeedZeroRedundancyOptimizer(model_parameters=model.parameters(), dp_optimizer=optimizer, config=None)
+    optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(model_parameters=model.parameters(), dp_optimizer=optimizer, config=None)
 
 
     lr_scheduler = get_scheduler(
