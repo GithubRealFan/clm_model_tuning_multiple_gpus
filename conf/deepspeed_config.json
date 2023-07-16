@@ -1,7 +1,6 @@
 {
-    "train_batch_size": 8,
+    "train_batch_size": 1,
     "train_micro_batch_size_per_gpu": 1,
-    "steps_per_print": 1,
     "gradient_accumulation_steps": 1,
     "zero_optimization": {
         "stage": 2,
@@ -15,8 +14,11 @@
         "dynamic_loss_scale": false
     },
     "activation_checkpointing": {
-        "partition_activations": false,
-        "allocate_fp16": false
+        "partition_activations": true,
+        "contiguous_gradients": true,
+        "allocate_fp16": true,
+        "sync": true,
+        "verbose": false
     },
     "wall_clock_breakdown": false
 }
