@@ -511,7 +511,7 @@ def find_free_port(start_port=5000, end_port=5099):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             result = s.connect_ex(('127.0.0.1', port))
             if result != 0:
-                return port
+                return str(port)
     return None
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -520,7 +520,7 @@ def main(cfg: DictConfig):
     os.environ['RANK'] = '0'
     os.environ['WORLD_SIZE'] = str(cfg.distributed.nprocs)
     os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = '5089'
+    os.environ['MASTER_PORT'] = find_free_port()
 
     # Use multiprocessing to enable distributed training with multiple GPUs
     mp.spawn(distributed_main, args=(cfg,), nprocs=cfg.distributed.nprocs, join=True)
