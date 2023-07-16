@@ -503,15 +503,14 @@ def distributed_main(rank, cfg):
             tokenizer.save_pretrained(cfg.output_dir)
 
 def find_free_port(start_port=5001, end_port=5099):
-    """ https://stackoverflow.com/questions/1365265/on-localhost-how-do-i-pick-a-free-port-number """
     import socket
-    from contextlib import closing
-
     for port in range(start_port, end_port + 1):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            result = s.connect_ex(('127.0.0.1', port))
-            if result != 0:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('127.0.0.1', port))
                 return str(port)
+            except socket.error:
+                continue
     return None
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
