@@ -5,7 +5,7 @@ from transformers import pipeline
 
 local_rank = int(os.getenv('LOCAL_RANK', '0'))
 world_size = int(os.getenv('WORLD_SIZE', '1'))
-generator = pipeline('text-generation', model='tiiuae/falcon-40b-instruct',
+generator = pipeline('text-generation', model='EleutherAI/gpt-neo-2.7B',
                      device=local_rank, trust_remote_code=True)
 
 
