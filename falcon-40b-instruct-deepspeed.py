@@ -4,8 +4,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 # Model and tokenizer
 model_name = "tiiuae/falcon-40b-instruct"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
 # DeepSpeed configuration
 deepspeed_config = {
